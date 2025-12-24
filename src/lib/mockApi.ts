@@ -13,6 +13,7 @@ export interface Vulnerability {
   port?: number;
   service?: string;
   recommendation: string;
+  category: string;
 }
 
 export interface ScanResult {
@@ -33,798 +34,756 @@ export interface ScanResult {
   };
 }
 
-// Comprehensive vulnerability database - 30+ scan types per system
-const vulnerabilityTemplates: Record<SystemType, Vulnerability[]> = {
-  smart_port: [
-    // Network Security (1-6)
-    {
-      id: 'SP001',
-      name: 'FTP Service Detected',
-      description: 'Unencrypted FTP service running on port 21. Credentials transmitted in plaintext.',
-      severity: 'high',
-      port: 21,
-      service: 'FTP',
-      recommendation: 'Replace FTP with SFTP or FTPS. Disable anonymous access.',
-    },
-    {
-      id: 'SP002',
-      name: 'Telnet Service Active',
-      description: 'Telnet service detected on port 23. Unencrypted remote access protocol.',
-      severity: 'critical',
-      port: 23,
-      service: 'Telnet',
-      recommendation: 'Disable Telnet immediately. Use SSH for remote access.',
-    },
-    {
-      id: 'SP003',
-      name: 'Open DNS Resolver',
-      description: 'DNS service accepting queries from external networks. Risk of DNS amplification attacks.',
-      severity: 'medium',
-      port: 53,
-      service: 'DNS',
-      recommendation: 'Configure DNS to only respond to internal queries.',
-    },
-    {
-      id: 'SP004',
-      name: 'SNMP v1/v2 Enabled',
-      description: 'Legacy SNMP versions with weak authentication detected.',
-      severity: 'high',
-      port: 161,
-      service: 'SNMP',
-      recommendation: 'Upgrade to SNMPv3 with authentication and encryption.',
-    },
-    {
-      id: 'SP005',
-      name: 'SMB Service Exposed',
-      description: 'Windows file sharing ports open to external network.',
-      severity: 'critical',
-      port: 445,
-      service: 'SMB',
-      recommendation: 'Block SMB ports at perimeter firewall. Use VPN for remote access.',
-    },
-    {
-      id: 'SP006',
-      name: 'RDP Service Exposed',
-      description: 'Remote Desktop Protocol accessible from external network.',
-      severity: 'critical',
-      port: 3389,
-      service: 'RDP',
-      recommendation: 'Disable direct RDP access. Implement VPN or jump server.',
-    },
-    // Industrial Control Systems (7-12)
-    {
-      id: 'SP007',
-      name: 'SCADA Modbus Port Exposed',
-      description: 'Industrial control system port 502 (Modbus) accessible from network.',
-      severity: 'critical',
-      port: 502,
-      service: 'Modbus',
-      recommendation: 'Implement network segmentation. Use VPN for SCADA access.',
-    },
-    {
-      id: 'SP008',
-      name: 'OPC UA Without Authentication',
-      description: 'OPC Unified Architecture service running without proper authentication.',
-      severity: 'high',
-      port: 4840,
-      service: 'OPC-UA',
-      recommendation: 'Enable certificate-based authentication for OPC UA.',
-    },
-    {
-      id: 'SP009',
-      name: 'DNP3 Protocol Unprotected',
-      description: 'DNP3 SCADA protocol communication without encryption.',
-      severity: 'high',
-      port: 20000,
-      service: 'DNP3',
-      recommendation: 'Implement DNP3 Secure Authentication or use VPN.',
-    },
-    {
-      id: 'SP010',
-      name: 'BACnet Port Open',
-      description: 'Building automation protocol accessible without authentication.',
-      severity: 'medium',
-      port: 47808,
-      service: 'BACnet',
-      recommendation: 'Segment BACnet network from IT infrastructure.',
-    },
-    {
-      id: 'SP011',
-      name: 'EtherNet/IP Exposed',
-      description: 'Industrial Ethernet protocol accessible from untrusted networks.',
-      severity: 'high',
-      port: 44818,
-      service: 'EtherNet/IP',
-      recommendation: 'Implement industrial firewall with deep packet inspection.',
-    },
-    {
-      id: 'SP012',
-      name: 'PLC Programming Port Open',
-      description: 'Programmable Logic Controller programming interface accessible.',
-      severity: 'critical',
-      port: 102,
-      service: 'S7comm',
-      recommendation: 'Restrict PLC access to engineering workstations only.',
-    },
-    // Web Security (13-18)
-    {
-      id: 'SP013',
-      name: 'Missing HSTS Header',
-      description: 'HTTP Strict Transport Security header not configured.',
-      severity: 'medium',
-      recommendation: 'Enable HSTS with max-age of at least 31536000 seconds.',
-    },
-    {
-      id: 'SP014',
-      name: 'Missing Content-Security-Policy',
-      description: 'No CSP header configured. Risk of XSS attacks.',
-      severity: 'medium',
-      recommendation: 'Implement strict Content-Security-Policy header.',
-    },
-    {
-      id: 'SP015',
-      name: 'Missing X-Frame-Options',
-      description: 'Clickjacking protection not enabled.',
-      severity: 'low',
-      recommendation: 'Add X-Frame-Options: DENY or SAMEORIGIN header.',
-    },
-    {
-      id: 'SP016',
-      name: 'Server Version Disclosure',
-      description: 'Web server revealing version information in headers.',
-      severity: 'low',
-      recommendation: 'Configure server to hide version information.',
-    },
-    {
-      id: 'SP017',
-      name: 'Directory Listing Enabled',
-      description: 'Web server exposing directory contents.',
-      severity: 'medium',
-      recommendation: 'Disable directory listing in web server configuration.',
-    },
-    {
-      id: 'SP018',
-      name: 'Insecure Cookie Configuration',
-      description: 'Session cookies missing Secure and HttpOnly flags.',
-      severity: 'medium',
-      recommendation: 'Set Secure, HttpOnly, and SameSite flags on all cookies.',
-    },
-    // SSL/TLS Security (19-24)
-    {
-      id: 'SP019',
-      name: 'Outdated SSL/TLS Protocol',
-      description: 'Server supports TLS 1.0 and TLS 1.1 which are deprecated.',
-      severity: 'medium',
-      recommendation: 'Disable TLS 1.0 and 1.1. Enable only TLS 1.2 and 1.3.',
-    },
-    {
-      id: 'SP020',
-      name: 'Weak Cipher Suites',
-      description: 'Server accepts weak cipher suites including RC4 and 3DES.',
-      severity: 'high',
-      recommendation: 'Configure server to use only strong cipher suites.',
-    },
-    {
-      id: 'SP021',
-      name: 'SSL Certificate Expiring',
-      description: 'SSL certificate expires within 30 days.',
-      severity: 'medium',
-      recommendation: 'Renew SSL certificate before expiration.',
-    },
-    {
-      id: 'SP022',
-      name: 'Self-Signed Certificate',
-      description: 'Using self-signed certificate instead of CA-issued.',
-      severity: 'low',
-      recommendation: 'Obtain certificate from trusted Certificate Authority.',
-    },
-    {
-      id: 'SP023',
-      name: 'Missing OCSP Stapling',
-      description: 'OCSP stapling not enabled for certificate validation.',
-      severity: 'low',
-      recommendation: 'Enable OCSP stapling for improved performance and privacy.',
-    },
-    {
-      id: 'SP024',
-      name: 'Vulnerable to POODLE Attack',
-      description: 'SSLv3 protocol enabled, vulnerable to POODLE attack.',
-      severity: 'high',
-      recommendation: 'Disable SSLv3 protocol immediately.',
-    },
-    // Authentication & Access (25-30)
-    {
-      id: 'SP025',
-      name: 'Default Credentials Detected',
-      description: 'System responding to common default username/password combinations.',
-      severity: 'critical',
-      recommendation: 'Change all default credentials immediately.',
-    },
-    {
-      id: 'SP026',
-      name: 'No Account Lockout Policy',
-      description: 'System allows unlimited login attempts.',
-      severity: 'high',
-      recommendation: 'Implement account lockout after 5 failed attempts.',
-    },
-    {
-      id: 'SP027',
-      name: 'Missing Multi-Factor Auth',
-      description: 'Administrative interfaces accessible with single-factor authentication.',
-      severity: 'medium',
-      recommendation: 'Implement MFA for all administrative access.',
-    },
-    {
-      id: 'SP028',
-      name: 'Exposed Admin Panel',
-      description: 'Administrative interface accessible from public network.',
-      severity: 'high',
-      recommendation: 'Restrict admin panel to internal network or VPN.',
-    },
-    {
-      id: 'SP029',
-      name: 'Session Timeout Too Long',
-      description: 'User sessions remain active for extended periods.',
-      severity: 'low',
-      recommendation: 'Reduce session timeout to 15-30 minutes.',
-    },
-    {
-      id: 'SP030',
-      name: 'Insecure Password Storage',
-      description: 'Password hashing using weak algorithms detected.',
-      severity: 'high',
-      recommendation: 'Use bcrypt, scrypt, or Argon2 for password hashing.',
-    },
-  ],
-  ship_network: [
-    // Maritime Navigation Systems (1-8)
-    {
-      id: 'SN001',
-      name: 'NMEA Network Exposed',
-      description: 'Navigation system data port accessible without authentication.',
-      severity: 'high',
-      port: 10110,
-      service: 'NMEA',
-      recommendation: 'Implement access control lists and network segmentation.',
-    },
-    {
-      id: 'SN002',
-      name: 'AIS Transponder Misconfiguration',
-      description: 'AIS system transmitting excessive vessel information.',
-      severity: 'medium',
-      recommendation: 'Review AIS configuration per IMO guidelines.',
-    },
-    {
-      id: 'SN003',
-      name: 'ECDIS Vulnerable Version',
-      description: 'Electronic Chart Display running outdated software.',
-      severity: 'high',
-      recommendation: 'Update ECDIS to latest manufacturer version.',
-    },
-    {
-      id: 'SN004',
-      name: 'GPS Spoofing Vulnerability',
-      description: 'GPS receiver lacks anti-spoofing protection.',
-      severity: 'critical',
-      recommendation: 'Install GPS authentication modules and multi-source positioning.',
-    },
-    {
-      id: 'SN005',
-      name: 'Radar System Network Access',
-      description: 'Radar interface accessible from crew network.',
-      severity: 'medium',
-      recommendation: 'Isolate navigation systems from general IT network.',
-    },
-    {
-      id: 'SN006',
-      name: 'Gyrocompass Remote Access',
-      description: 'Gyrocompass calibration interface exposed to network.',
-      severity: 'medium',
-      port: 8080,
-      service: 'HTTP',
-      recommendation: 'Disable remote calibration or restrict to maintenance VLAN.',
-    },
-    {
-      id: 'SN007',
-      name: 'Autopilot System Unprotected',
-      description: 'Autopilot control commands can be sent without authentication.',
-      severity: 'critical',
-      recommendation: 'Implement command authentication and physical override.',
-    },
-    {
-      id: 'SN008',
-      name: 'Voyage Data Recorder Access',
-      description: 'VDR data accessible from network without encryption.',
-      severity: 'medium',
-      recommendation: 'Encrypt VDR communications and restrict access.',
-    },
-    // Communication Systems (9-16)
-    {
-      id: 'SN009',
-      name: 'Satellite Link Unencrypted',
-      description: 'VSAT communication not using end-to-end encryption.',
-      severity: 'high',
-      recommendation: 'Implement VPN tunnel for all satellite communications.',
-    },
-    {
-      id: 'SN010',
-      name: 'GMDSS System Exposed',
-      description: 'Global Maritime Distress System accessible remotely.',
-      severity: 'critical',
-      recommendation: 'Physically isolate GMDSS from data networks.',
-    },
-    {
-      id: 'SN011',
-      name: 'Inmarsat Terminal Vulnerability',
-      description: 'Satellite terminal running firmware with known vulnerabilities.',
-      severity: 'high',
-      recommendation: 'Update Inmarsat terminal firmware to latest version.',
-    },
-    {
-      id: 'SN012',
-      name: 'VoIP System Misconfigured',
-      description: 'Ship VoIP system allowing unauthorized external calls.',
-      severity: 'medium',
-      port: 5060,
-      service: 'SIP',
-      recommendation: 'Configure SIP firewall rules and authentication.',
-    },
-    {
-      id: 'SN013',
-      name: 'NAVTEX Receiver Network Access',
-      description: 'NAVTEX system connected to ship network without protection.',
-      severity: 'low',
-      recommendation: 'Segment NAVTEX from crew and cargo networks.',
-    },
-    {
-      id: 'SN014',
-      name: 'SSB Radio Interface Exposed',
-      description: 'Single Sideband radio control interface accessible.',
-      severity: 'medium',
-      recommendation: 'Restrict radio control to bridge network only.',
-    },
-    {
-      id: 'SN015',
-      name: 'Fleet Management System Weak Auth',
-      description: 'Fleet tracking system using weak credentials.',
-      severity: 'high',
-      recommendation: 'Implement strong authentication for fleet management.',
-    },
-    {
-      id: 'SN016',
-      name: 'Crew WiFi Bridged to OT',
-      description: 'Crew WiFi network has connectivity to operational technology.',
-      severity: 'critical',
-      recommendation: 'Implement strict network segmentation between IT and OT.',
-    },
-    // Engine Room & Control Systems (17-24)
-    {
-      id: 'SN017',
-      name: 'Engine Control System Exposed',
-      description: 'Main engine control accessible from bridge network.',
-      severity: 'high',
-      port: 502,
-      service: 'Modbus',
-      recommendation: 'Segment engine control network with industrial firewall.',
-    },
-    {
-      id: 'SN018',
-      name: 'Ballast Control Vulnerability',
-      description: 'Ballast water management system lacks authentication.',
-      severity: 'high',
-      recommendation: 'Implement access control for ballast operations.',
-    },
-    {
-      id: 'SN019',
-      name: 'Power Management Exposed',
-      description: 'Ship power management system accessible remotely.',
-      severity: 'critical',
-      recommendation: 'Isolate power management from external networks.',
-    },
-    {
-      id: 'SN020',
-      name: 'HVAC System Network Access',
-      description: 'Climate control system connected to general network.',
-      severity: 'low',
-      recommendation: 'Segment HVAC controls from crew network.',
-    },
-    {
-      id: 'SN021',
-      name: 'Bilge Alarm System Unprotected',
-      description: 'Bilge monitoring system lacks integrity protection.',
-      severity: 'medium',
-      recommendation: 'Implement authenticated alarm messaging.',
-    },
-    {
-      id: 'SN022',
-      name: 'Fire Detection Panel Networked',
-      description: 'Fire safety system connected to IT infrastructure.',
-      severity: 'high',
-      recommendation: 'Ensure fire systems are isolated with redundant connectivity.',
-    },
-    {
-      id: 'SN023',
-      name: 'Fuel Management System Access',
-      description: 'Fuel monitoring and transfer controls accessible.',
-      severity: 'medium',
-      recommendation: 'Restrict fuel system access to authorized personnel.',
-    },
-    {
-      id: 'SN024',
-      name: 'Propulsion Control Weakness',
-      description: 'Propulsion system control using unencrypted protocols.',
-      severity: 'critical',
-      recommendation: 'Upgrade to encrypted control protocols.',
-    },
-    // General Security (25-30)
-    {
-      id: 'SN025',
-      name: 'Missing Security Patches',
-      description: 'Operating systems missing critical security updates.',
-      severity: 'high',
-      recommendation: 'Establish regular patching schedule during port calls.',
-    },
-    {
-      id: 'SN026',
-      name: 'No Intrusion Detection',
-      description: 'Ship network lacks intrusion detection system.',
-      severity: 'medium',
-      recommendation: 'Deploy maritime-certified IDS solution.',
-    },
-    {
-      id: 'SN027',
-      name: 'USB Port Unrestricted',
-      description: 'USB ports on bridge systems not controlled.',
-      severity: 'medium',
-      recommendation: 'Implement USB device control policies.',
-    },
-    {
-      id: 'SN028',
-      name: 'No Network Logging',
-      description: 'Network traffic not being logged for forensics.',
-      severity: 'medium',
-      recommendation: 'Implement centralized logging for all network activity.',
-    },
-    {
-      id: 'SN029',
-      name: 'Backup Systems Unencrypted',
-      description: 'System backups stored without encryption.',
-      severity: 'medium',
-      recommendation: 'Encrypt all backup data and secure backup media.',
-    },
-    {
-      id: 'SN030',
-      name: 'No Cyber Incident Response Plan',
-      description: 'Vessel lacks documented cyber incident response procedures.',
-      severity: 'medium',
-      recommendation: 'Develop and test cyber incident response plan.',
-    },
-  ],
-  logistics_system: [
-    // Database Security (1-6)
-    {
-      id: 'LS001',
-      name: 'Database Port Exposed',
-      description: 'MySQL/PostgreSQL port accessible from external network.',
-      severity: 'critical',
-      port: 3306,
-      service: 'MySQL',
-      recommendation: 'Restrict database access to application servers only.',
-    },
-    {
-      id: 'LS002',
-      name: 'MongoDB Without Auth',
-      description: 'MongoDB instance running without authentication.',
-      severity: 'critical',
-      port: 27017,
-      service: 'MongoDB',
-      recommendation: 'Enable MongoDB authentication immediately.',
-    },
-    {
-      id: 'LS003',
-      name: 'Redis Exposed',
-      description: 'Redis cache server accessible without password.',
-      severity: 'high',
-      port: 6379,
-      service: 'Redis',
-      recommendation: 'Configure Redis password and bind to localhost.',
-    },
-    {
-      id: 'LS004',
-      name: 'Elasticsearch Unprotected',
-      description: 'Elasticsearch cluster accessible without authentication.',
-      severity: 'critical',
-      port: 9200,
-      service: 'Elasticsearch',
-      recommendation: 'Enable X-Pack security or search guard.',
-    },
-    {
-      id: 'LS005',
-      name: 'SQL Injection Vulnerable',
-      description: 'Application endpoints vulnerable to SQL injection.',
-      severity: 'critical',
-      recommendation: 'Use parameterized queries and input validation.',
-    },
-    {
-      id: 'LS006',
-      name: 'Database Backup Exposed',
-      description: 'Database backup files accessible via web server.',
-      severity: 'critical',
-      recommendation: 'Move backup files outside web root and restrict access.',
-    },
-    // API Security (7-12)
-    {
-      id: 'LS007',
-      name: 'API Without Authentication',
-      description: 'REST API endpoints accessible without authentication.',
-      severity: 'high',
-      recommendation: 'Implement OAuth 2.0 or API key authentication.',
-    },
-    {
-      id: 'LS008',
-      name: 'Missing Rate Limiting',
-      description: 'API endpoints lack rate limiting, vulnerable to abuse.',
-      severity: 'medium',
-      recommendation: 'Implement rate limiting on all API endpoints.',
-    },
-    {
-      id: 'LS009',
-      name: 'API Keys in URL',
-      description: 'API keys being passed in URL query parameters.',
-      severity: 'high',
-      recommendation: 'Pass API keys in headers, not URL parameters.',
-    },
-    {
-      id: 'LS010',
-      name: 'Missing Input Validation',
-      description: 'API endpoints not validating input data types.',
-      severity: 'medium',
-      recommendation: 'Implement strict input validation and sanitization.',
-    },
-    {
-      id: 'LS011',
-      name: 'CORS Misconfiguration',
-      description: 'CORS policy allows requests from any origin.',
-      severity: 'medium',
-      recommendation: 'Restrict CORS to specific trusted domains.',
-    },
-    {
-      id: 'LS012',
-      name: 'API Documentation Exposed',
-      description: 'Swagger/OpenAPI documentation accessible publicly.',
-      severity: 'low',
-      recommendation: 'Restrict API documentation to internal network.',
-    },
-    // Authentication (13-18)
-    {
-      id: 'LS013',
-      name: 'Weak Password Policy',
-      description: 'System allows passwords shorter than 12 characters.',
-      severity: 'medium',
-      recommendation: 'Enforce minimum 12 character passwords with complexity.',
-    },
-    {
-      id: 'LS014',
-      name: 'Missing MFA Option',
-      description: 'Multi-factor authentication not available for users.',
-      severity: 'medium',
-      recommendation: 'Implement TOTP or SMS-based MFA.',
-    },
-    {
-      id: 'LS015',
-      name: 'JWT Token Not Expiring',
-      description: 'JWT tokens have no expiration or very long lifetime.',
-      severity: 'high',
-      recommendation: 'Set JWT expiration to 15-60 minutes with refresh tokens.',
-    },
-    {
-      id: 'LS016',
-      name: 'Password Reset Vulnerability',
-      description: 'Password reset tokens not expiring properly.',
-      severity: 'high',
-      recommendation: 'Expire reset tokens after 15 minutes.',
-    },
-    {
-      id: 'LS017',
-      name: 'Session Fixation',
-      description: 'Session ID not regenerated after login.',
-      severity: 'high',
-      recommendation: 'Regenerate session ID upon authentication.',
-    },
-    {
-      id: 'LS018',
-      name: 'Insecure Remember Me',
-      description: 'Remember me functionality using predictable tokens.',
-      severity: 'medium',
-      recommendation: 'Use cryptographically secure random tokens.',
-    },
-    // Infrastructure (19-24)
-    {
-      id: 'LS019',
-      name: 'Docker API Exposed',
-      description: 'Docker daemon API accessible without authentication.',
-      severity: 'critical',
-      port: 2375,
-      service: 'Docker',
-      recommendation: 'Enable TLS and authentication for Docker API.',
-    },
-    {
-      id: 'LS020',
-      name: 'Kubernetes Dashboard Exposed',
-      description: 'K8s dashboard accessible from external network.',
-      severity: 'critical',
-      port: 8443,
-      service: 'K8s',
-      recommendation: 'Restrict dashboard to internal network with RBAC.',
-    },
-    {
-      id: 'LS021',
-      name: 'SSH Using Password',
-      description: 'SSH server accepting password authentication.',
-      severity: 'medium',
-      port: 22,
-      service: 'SSH',
-      recommendation: 'Disable password auth, use key-based only.',
-    },
-    {
-      id: 'LS022',
-      name: 'Outdated Container Images',
-      description: 'Container images contain known vulnerabilities.',
-      severity: 'high',
-      recommendation: 'Update base images and scan regularly.',
-    },
-    {
-      id: 'LS023',
-      name: 'Secrets in Environment',
-      description: 'Sensitive data stored in environment variables.',
-      severity: 'medium',
-      recommendation: 'Use secrets management solution like Vault.',
-    },
-    {
-      id: 'LS024',
-      name: 'Logging Sensitive Data',
-      description: 'Application logs containing sensitive information.',
-      severity: 'high',
-      recommendation: 'Implement log scrubbing and data masking.',
-    },
-    // Supply Chain & Tracking (25-30)
-    {
-      id: 'LS025',
-      name: 'Container Tracking Unencrypted',
-      description: 'Container tracking data transmitted without encryption.',
-      severity: 'high',
-      recommendation: 'Implement TLS for all tracking communications.',
-    },
-    {
-      id: 'LS026',
-      name: 'EDI Connection Insecure',
-      description: 'Electronic Data Interchange using deprecated protocols.',
-      severity: 'medium',
-      recommendation: 'Upgrade to AS4 or secure SFTP for EDI.',
-    },
-    {
-      id: 'LS027',
-      name: 'RFID System Vulnerable',
-      description: 'RFID readers using unencrypted communication.',
-      severity: 'medium',
-      recommendation: 'Implement encrypted RFID protocols.',
-    },
-    {
-      id: 'LS028',
-      name: 'Customs System Integration Weak',
-      description: 'Customs API integration using weak authentication.',
-      severity: 'high',
-      recommendation: 'Implement certificate-based mutual TLS.',
-    },
-    {
-      id: 'LS029',
-      name: 'Booking System SQL Injection',
-      description: 'Cargo booking system vulnerable to injection attacks.',
-      severity: 'critical',
-      recommendation: 'Use ORM and parameterized queries.',
-    },
-    {
-      id: 'LS030',
-      name: 'Manifest Data Unprotected',
-      description: 'Shipping manifest accessible without authorization.',
-      severity: 'high',
-      recommendation: 'Implement role-based access control for manifests.',
-    },
-  ],
-};
+// 70 Unique Security Checks for Smart Port / Naval Infrastructure
+const scanChecks: Vulnerability[] = [
+  // 🔴 NETWORK & PERIMETER SECURITY CHECKS (1-10)
+  {
+    id: 'NPS001',
+    name: 'Open Common Ports Check',
+    description: 'Common service ports (21, 22, 23, 80, 443, 3389) found open and accessible from external networks.',
+    severity: 'high',
+    port: 22,
+    service: 'Multiple',
+    recommendation: 'Close unnecessary ports and implement firewall rules to restrict access.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS002',
+    name: 'Excessive Open Ports Exposure',
+    description: 'More than 20 ports detected open on the target system, increasing attack surface.',
+    severity: 'high',
+    recommendation: 'Conduct port audit and close all non-essential services.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS003',
+    name: 'Insecure Service Port Detection (FTP/Telnet)',
+    description: 'Legacy insecure services FTP (21) and Telnet (23) detected running on the system.',
+    severity: 'critical',
+    port: 21,
+    service: 'FTP/Telnet',
+    recommendation: 'Disable FTP and Telnet. Use SFTP and SSH as secure alternatives.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS004',
+    name: 'Unnecessary Service Exposure',
+    description: 'Non-essential services exposed to network including print spooler, NetBIOS, and RPC.',
+    severity: 'medium',
+    recommendation: 'Disable unnecessary services and implement service hardening.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS005',
+    name: 'Port-to-Service Mismatch Check',
+    description: 'Services running on non-standard ports detected, possible evasion technique.',
+    severity: 'medium',
+    recommendation: 'Investigate mismatched services and normalize port assignments.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS006',
+    name: 'Publicly Reachable Internal Services',
+    description: 'Internal services (database, admin panels) accessible from public network.',
+    severity: 'critical',
+    port: 3306,
+    service: 'MySQL',
+    recommendation: 'Implement network segmentation and restrict internal services to private networks.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS007',
+    name: 'Network Segmentation Absence Check',
+    description: 'No network segmentation detected between IT, OT, and guest networks.',
+    severity: 'critical',
+    recommendation: 'Implement VLANs and network zones with proper access controls.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS008',
+    name: 'Firewall Misconfiguration Indicator',
+    description: 'Firewall rules allow broad access patterns including ANY-ANY rules detected.',
+    severity: 'high',
+    recommendation: 'Audit firewall rules and implement principle of least privilege.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS009',
+    name: 'ICMP Exposure Check',
+    description: 'System responds to ICMP echo requests, enabling network reconnaissance.',
+    severity: 'low',
+    recommendation: 'Block ICMP at perimeter firewall for external interfaces.',
+    category: 'Network & Perimeter Security',
+  },
+  {
+    id: 'NPS010',
+    name: 'Default Gateway Exposure Check',
+    description: 'Network gateway management interface accessible from untrusted networks.',
+    severity: 'high',
+    port: 443,
+    service: 'HTTPS',
+    recommendation: 'Restrict gateway management to dedicated management VLAN.',
+    category: 'Network & Perimeter Security',
+  },
 
-// Simulate network delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  // 🟠 REMOTE ACCESS & MANAGEMENT (11-18)
+  {
+    id: 'RAM001',
+    name: 'Telnet Service Enabled Check',
+    description: 'Telnet service active on port 23, transmitting credentials in plaintext.',
+    severity: 'critical',
+    port: 23,
+    service: 'Telnet',
+    recommendation: 'Disable Telnet immediately and migrate to SSH.',
+    category: 'Remote Access & Management',
+  },
+  {
+    id: 'RAM002',
+    name: 'FTP Service Enabled Check',
+    description: 'FTP service running without encryption, exposing file transfers.',
+    severity: 'high',
+    port: 21,
+    service: 'FTP',
+    recommendation: 'Replace FTP with SFTP or FTPS for secure file transfers.',
+    category: 'Remote Access & Management',
+  },
+  {
+    id: 'RAM003',
+    name: 'SSH Weak Configuration Check',
+    description: 'SSH service using weak ciphers, key exchange algorithms, or protocol version 1.',
+    severity: 'high',
+    port: 22,
+    service: 'SSH',
+    recommendation: 'Harden SSH configuration with strong ciphers and disable SSHv1.',
+    category: 'Remote Access & Management',
+  },
+  {
+    id: 'RAM004',
+    name: 'Remote Management Port Exposure',
+    description: 'Remote management ports (RDP 3389, VNC 5900) exposed to public network.',
+    severity: 'critical',
+    port: 3389,
+    service: 'RDP',
+    recommendation: 'Implement VPN or jump server for remote management access.',
+    category: 'Remote Access & Management',
+  },
+  {
+    id: 'RAM005',
+    name: 'Legacy Remote Access Protocol Detection',
+    description: 'Legacy protocols (rsh, rlogin, rexec) detected on the system.',
+    severity: 'critical',
+    port: 514,
+    service: 'RSH',
+    recommendation: 'Disable all legacy remote access protocols immediately.',
+    category: 'Remote Access & Management',
+  },
+  {
+    id: 'RAM006',
+    name: 'Plaintext Authentication Service Detection',
+    description: 'Services accepting plaintext authentication without TLS encryption.',
+    severity: 'high',
+    recommendation: 'Enforce TLS/SSL for all authentication services.',
+    category: 'Remote Access & Management',
+  },
+  {
+    id: 'RAM007',
+    name: 'Multiple Remote Access Services Enabled',
+    description: 'Multiple remote access methods active (SSH, RDP, VNC, TeamViewer).',
+    severity: 'medium',
+    recommendation: 'Standardize on single secure remote access solution.',
+    category: 'Remote Access & Management',
+  },
+  {
+    id: 'RAM008',
+    name: 'Remote Admin Interface Exposure',
+    description: 'Administrative web interfaces accessible without IP restrictions.',
+    severity: 'high',
+    port: 8443,
+    service: 'HTTPS',
+    recommendation: 'Restrict admin interfaces to whitelisted IP addresses.',
+    category: 'Remote Access & Management',
+  },
 
-// Generate random subset of vulnerabilities (8-15 findings per scan)
-function getRandomVulnerabilities(systemType: SystemType): Vulnerability[] {
-  const templates = vulnerabilityTemplates[systemType];
-  const minCount = 8;
-  const maxCount = 15;
-  const count = Math.floor(Math.random() * (maxCount - minCount + 1)) + minCount;
-  const shuffled = [...templates].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(count, templates.length));
+  // 🟡 WEB & APPLICATION SECURITY (19-29)
+  {
+    id: 'WAS001',
+    name: 'Missing HTTP Security Headers',
+    description: 'Critical HTTP security headers not configured on web applications.',
+    severity: 'medium',
+    recommendation: 'Implement all recommended HTTP security headers.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS002',
+    name: 'Missing HSTS Header',
+    description: 'HTTP Strict Transport Security header not configured.',
+    severity: 'medium',
+    recommendation: 'Enable HSTS with max-age of at least 31536000 seconds.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS003',
+    name: 'Missing Content Security Policy',
+    description: 'No Content-Security-Policy header, increasing XSS attack risk.',
+    severity: 'medium',
+    recommendation: 'Implement strict Content-Security-Policy header.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS004',
+    name: 'Missing X-Frame-Options Header',
+    description: 'Clickjacking protection not enabled via X-Frame-Options.',
+    severity: 'low',
+    recommendation: 'Add X-Frame-Options: DENY or SAMEORIGIN header.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS005',
+    name: 'Missing X-Content-Type-Options',
+    description: 'MIME type sniffing protection not enabled.',
+    severity: 'low',
+    recommendation: 'Add X-Content-Type-Options: nosniff header.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS006',
+    name: 'HTTP Allowed Over HTTPS Systems',
+    description: 'System allows unencrypted HTTP connections alongside HTTPS.',
+    severity: 'medium',
+    recommendation: 'Enforce HTTPS-only and redirect all HTTP to HTTPS.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS007',
+    name: 'Insecure HTTP Methods Enabled',
+    description: 'Dangerous HTTP methods (PUT, DELETE, TRACE) enabled on web server.',
+    severity: 'medium',
+    recommendation: 'Disable unnecessary HTTP methods in server configuration.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS008',
+    name: 'Directory Listing Enabled Indicator',
+    description: 'Web server exposing directory contents to unauthenticated users.',
+    severity: 'medium',
+    recommendation: 'Disable directory listing in web server configuration.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS009',
+    name: 'Default Web Page Detected',
+    description: 'Default installation page or sample content still present.',
+    severity: 'low',
+    recommendation: 'Remove default pages and deploy custom error pages.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS010',
+    name: 'Server Banner Disclosure',
+    description: 'Web server revealing software name and version in HTTP headers.',
+    severity: 'low',
+    recommendation: 'Configure server to suppress version information.',
+    category: 'Web & Application Security',
+  },
+  {
+    id: 'WAS011',
+    name: 'Web Server Version Disclosure',
+    description: 'Detailed web server version exposed in response headers.',
+    severity: 'low',
+    recommendation: 'Remove or obfuscate server version headers.',
+    category: 'Web & Application Security',
+  },
+
+  // 🟢 TLS / CRYPTOGRAPHY & COMMUNICATION (30-40)
+  {
+    id: 'TLS001',
+    name: 'HTTPS Not Enforced Check',
+    description: 'HTTPS not enforced, allowing data transmission over unencrypted HTTP.',
+    severity: 'high',
+    recommendation: 'Implement mandatory HTTPS with proper redirects.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS002',
+    name: 'SSL/TLS Not Configured',
+    description: 'No SSL/TLS configuration found on public-facing services.',
+    severity: 'critical',
+    recommendation: 'Obtain and install valid SSL/TLS certificates.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS003',
+    name: 'Weak TLS Protocol Support',
+    description: 'Server supports deprecated TLS 1.0 and TLS 1.1 protocols.',
+    severity: 'medium',
+    recommendation: 'Disable TLS 1.0/1.1 and enforce TLS 1.2 or higher.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS004',
+    name: 'Deprecated Cipher Suite Support',
+    description: 'Server accepts weak cipher suites including RC4, 3DES, and NULL ciphers.',
+    severity: 'high',
+    recommendation: 'Configure server to use only strong modern cipher suites.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS005',
+    name: 'Self-Signed Certificate Detection',
+    description: 'Self-signed certificate in use instead of CA-issued certificate.',
+    severity: 'medium',
+    recommendation: 'Obtain certificate from trusted Certificate Authority.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS006',
+    name: 'Certificate Expiry Check',
+    description: 'SSL/TLS certificate expires within 30 days or already expired.',
+    severity: 'high',
+    recommendation: 'Renew SSL certificate before expiration date.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS007',
+    name: 'Certificate CN Mismatch Check',
+    description: 'Certificate Common Name does not match the server hostname.',
+    severity: 'medium',
+    recommendation: 'Obtain certificate with correct CN or SAN entries.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS008',
+    name: 'Insecure Key Length Detection',
+    description: 'RSA key length less than 2048 bits detected.',
+    severity: 'high',
+    recommendation: 'Use minimum 2048-bit RSA keys or 256-bit ECC keys.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS009',
+    name: 'Mixed Content Detection',
+    description: 'HTTPS pages loading resources over unencrypted HTTP.',
+    severity: 'medium',
+    recommendation: 'Ensure all resources are loaded over HTTPS.',
+    category: 'TLS & Cryptography',
+  },
+  {
+    id: 'TLS010',
+    name: 'Plaintext Data Transmission Indicator',
+    description: 'Sensitive data transmitted without encryption over the network.',
+    severity: 'critical',
+    recommendation: 'Implement end-to-end encryption for all sensitive data.',
+    category: 'TLS & Cryptography',
+  },
+
+  // 🔵 AUTHENTICATION & ACCESS CONTROL (41-50)
+  {
+    id: 'AAC001',
+    name: 'Default Credential Usage Indicator',
+    description: 'System responding to default username/password combinations.',
+    severity: 'critical',
+    recommendation: 'Change all default credentials immediately.',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC002',
+    name: 'Weak Authentication Policy Indicator',
+    description: 'Weak password policy allowing simple or short passwords.',
+    severity: 'high',
+    recommendation: 'Implement strong password policy with complexity requirements.',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC003',
+    name: 'Missing Account Lockout Policy Indicator',
+    description: 'No account lockout after failed login attempts detected.',
+    severity: 'high',
+    recommendation: 'Implement account lockout after 5 failed attempts.',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC004',
+    name: 'Excessive Privilege Exposure Indicator',
+    description: 'Users or services operating with excessive privileges.',
+    severity: 'high',
+    recommendation: 'Implement principle of least privilege across all accounts.',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC005',
+    name: 'Anonymous Access Enabled Check',
+    description: 'Anonymous or unauthenticated access allowed to sensitive resources.',
+    severity: 'high',
+    recommendation: 'Disable anonymous access and require authentication.',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC006',
+    name: 'Guest Account Enabled Indicator',
+    description: 'Guest or default accounts remain enabled on the system.',
+    severity: 'medium',
+    recommendation: 'Disable all guest and default accounts.',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC007',
+    name: 'Unrestricted API Access Indicator',
+    description: 'APIs accessible without authentication or rate limiting.',
+    severity: 'high',
+    recommendation: 'Implement API authentication and rate limiting.',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC008',
+    name: 'Token-Based Authentication Absence',
+    description: 'Session management using weak or predictable tokens.',
+    severity: 'medium',
+    recommendation: 'Implement secure token-based authentication (JWT, OAuth).',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC009',
+    name: 'Session Security Misconfiguration Indicator',
+    description: 'Session cookies missing Secure, HttpOnly, or SameSite flags.',
+    severity: 'medium',
+    recommendation: 'Configure secure cookie attributes for all sessions.',
+    category: 'Authentication & Access Control',
+  },
+  {
+    id: 'AAC010',
+    name: 'Missing Multi-Factor Authentication',
+    description: 'Administrative interfaces lack multi-factor authentication.',
+    severity: 'high',
+    recommendation: 'Implement MFA for all administrative and privileged access.',
+    category: 'Authentication & Access Control',
+  },
+
+  // 🟣 CONFIGURATION & HARDENING (51-59)
+  {
+    id: 'CFH001',
+    name: 'Default Configuration Detected',
+    description: 'System running with default configuration settings.',
+    severity: 'medium',
+    recommendation: 'Apply security hardening guidelines and customize configuration.',
+    category: 'Configuration & Hardening',
+  },
+  {
+    id: 'CFH002',
+    name: 'Unpatched Service Version Indicator',
+    description: 'Services running outdated versions with known vulnerabilities.',
+    severity: 'critical',
+    recommendation: 'Apply latest security patches and updates.',
+    category: 'Configuration & Hardening',
+  },
+  {
+    id: 'CFH003',
+    name: 'Legacy Software Usage Indicator',
+    description: 'End-of-life or unsupported software in use.',
+    severity: 'high',
+    recommendation: 'Upgrade to supported software versions.',
+    category: 'Configuration & Hardening',
+  },
+  {
+    id: 'CFH004',
+    name: 'Debug Mode Enabled Indicator',
+    description: 'Application or service running in debug mode in production.',
+    severity: 'high',
+    recommendation: 'Disable debug mode in production environments.',
+    category: 'Configuration & Hardening',
+  },
+  {
+    id: 'CFH005',
+    name: 'Test Interface Exposure',
+    description: 'Test or development interfaces accessible in production.',
+    severity: 'medium',
+    recommendation: 'Remove or disable all test interfaces in production.',
+    category: 'Configuration & Hardening',
+  },
+  {
+    id: 'CFH006',
+    name: 'Backup File Exposure Indicator',
+    description: 'Backup files (.bak, .old, .backup) accessible via web.',
+    severity: 'medium',
+    recommendation: 'Remove backup files from web-accessible directories.',
+    category: 'Configuration & Hardening',
+  },
+  {
+    id: 'CFH007',
+    name: 'Error Handling Misconfiguration',
+    description: 'Detailed error messages exposing system information.',
+    severity: 'medium',
+    recommendation: 'Implement custom error pages without technical details.',
+    category: 'Configuration & Hardening',
+  },
+  {
+    id: 'CFH008',
+    name: 'Excessive Information Disclosure',
+    description: 'System revealing sensitive technical information in responses.',
+    severity: 'medium',
+    recommendation: 'Review and minimize information exposed in responses.',
+    category: 'Configuration & Hardening',
+  },
+  {
+    id: 'CFH009',
+    name: 'Logging & Monitoring Absence Indicator',
+    description: 'Insufficient logging and monitoring capabilities detected.',
+    severity: 'high',
+    recommendation: 'Implement comprehensive logging and real-time monitoring.',
+    category: 'Configuration & Hardening',
+  },
+
+  // ⚫ IoT / OT / MARITIME-SPECIFIC (60-67)
+  {
+    id: 'IOT001',
+    name: 'IoT Device Exposure Indicator',
+    description: 'IoT devices accessible from external network without protection.',
+    severity: 'high',
+    recommendation: 'Segment IoT devices and implement access controls.',
+    category: 'IoT/OT Maritime Systems',
+  },
+  {
+    id: 'IOT002',
+    name: 'OT Protocol Exposure Indicator',
+    description: 'Industrial protocols (Modbus, DNP3, OPC) accessible without protection.',
+    severity: 'critical',
+    port: 502,
+    service: 'Modbus',
+    recommendation: 'Implement industrial firewall with protocol-aware filtering.',
+    category: 'IoT/OT Maritime Systems',
+  },
+  {
+    id: 'IOT003',
+    name: 'SCADA Interface Exposure Indicator',
+    description: 'SCADA HMI or control interfaces accessible from IT network.',
+    severity: 'critical',
+    recommendation: 'Physically and logically isolate SCADA systems.',
+    category: 'IoT/OT Maritime Systems',
+  },
+  {
+    id: 'IOT004',
+    name: 'Unauthenticated Device Communication',
+    description: 'OT/IoT devices communicating without authentication.',
+    severity: 'high',
+    recommendation: 'Implement device authentication for all OT communications.',
+    category: 'IoT/OT Maritime Systems',
+  },
+  {
+    id: 'IOT005',
+    name: 'Weak Device Identity Enforcement',
+    description: 'Weak or absent device identity verification mechanisms.',
+    severity: 'high',
+    recommendation: 'Implement certificate-based device identity.',
+    category: 'IoT/OT Maritime Systems',
+  },
+  {
+    id: 'IOT006',
+    name: 'Firmware Update Security Absence',
+    description: 'Devices accepting unsigned firmware updates.',
+    severity: 'high',
+    recommendation: 'Implement secure boot and signed firmware validation.',
+    category: 'IoT/OT Maritime Systems',
+  },
+  {
+    id: 'IOT007',
+    name: 'Insecure Device Management Interface',
+    description: 'Device management interfaces using weak authentication.',
+    severity: 'high',
+    recommendation: 'Secure device management with strong authentication.',
+    category: 'IoT/OT Maritime Systems',
+  },
+  {
+    id: 'IOT008',
+    name: 'Flat OT Network Indicator',
+    description: 'No segmentation between OT zones and levels detected.',
+    severity: 'critical',
+    recommendation: 'Implement Purdue Model network segmentation.',
+    category: 'IoT/OT Maritime Systems',
+  },
+
+  // 🔐 GOVERNANCE & DEFENCE-ALIGNED CHECKS (68-70)
+  {
+    id: 'GOV001',
+    name: 'CERT-In Compliance Indicator',
+    description: 'Non-compliance with CERT-In security guidelines detected.',
+    severity: 'high',
+    recommendation: 'Review and implement CERT-In security advisories.',
+    category: 'Governance & Defence',
+  },
+  {
+    id: 'GOV002',
+    name: 'NIC Security Baseline Deviation',
+    description: 'Deviation from NIC security baseline standards detected.',
+    severity: 'medium',
+    recommendation: 'Align systems with NIC security baseline requirements.',
+    category: 'Governance & Defence',
+  },
+  {
+    id: 'GOV003',
+    name: 'Absence of Cyber Hygiene Controls',
+    description: 'Basic cyber hygiene controls not implemented.',
+    severity: 'medium',
+    recommendation: 'Implement cyber hygiene best practices and regular audits.',
+    category: 'Governance & Defence',
+  },
+  {
+    id: 'GOV004',
+    name: 'Incident Response Readiness Indicator',
+    description: 'No documented incident response plan or procedures.',
+    severity: 'high',
+    recommendation: 'Develop and test cyber incident response plan.',
+    category: 'Governance & Defence',
+  },
+  {
+    id: 'GOV005',
+    name: 'Defence-in-Depth Control Absence',
+    description: 'Single layer of security without defence-in-depth strategy.',
+    severity: 'high',
+    recommendation: 'Implement multi-layer security controls and monitoring.',
+    category: 'Governance & Defence',
+  },
+];
+
+// Comprehensive scan phases - 70 unique checks
+const scanPhases = [
+  { phase: 'Network Discovery', checks: 'Mapping network topology and hosts...', duration: 800 },
+  { phase: 'Open Common Ports Check', checks: 'Scanning standard service ports (21, 22, 23, 80, 443, 3389)...', duration: 600 },
+  { phase: 'Excessive Ports Analysis', checks: 'Identifying excessive open port exposure...', duration: 500 },
+  { phase: 'Insecure Service Detection', checks: 'Detecting FTP and Telnet services...', duration: 600 },
+  { phase: 'Unnecessary Services Scan', checks: 'Finding non-essential exposed services...', duration: 500 },
+  { phase: 'Port-Service Mapping', checks: 'Verifying port-to-service consistency...', duration: 400 },
+  { phase: 'Internal Services Exposure', checks: 'Checking publicly reachable internal services...', duration: 600 },
+  { phase: 'Network Segmentation Check', checks: 'Analyzing network segmentation architecture...', duration: 700 },
+  { phase: 'Firewall Configuration Audit', checks: 'Reviewing firewall rules and policies...', duration: 800 },
+  { phase: 'ICMP/Gateway Exposure', checks: 'Testing ICMP and gateway exposure...', duration: 400 },
+  { phase: 'Remote Access Analysis', checks: 'Scanning Telnet, FTP, SSH configurations...', duration: 700 },
+  { phase: 'Legacy Protocol Detection', checks: 'Detecting legacy remote access protocols...', duration: 500 },
+  { phase: 'Admin Interface Discovery', checks: 'Finding exposed admin interfaces...', duration: 600 },
+  { phase: 'HTTP Security Headers', checks: 'Checking HSTS, CSP, X-Frame-Options...', duration: 600 },
+  { phase: 'Web Application Analysis', checks: 'Analyzing web security configurations...', duration: 700 },
+  { phase: 'Directory/Banner Exposure', checks: 'Checking directory listing and server disclosure...', duration: 500 },
+  { phase: 'TLS/SSL Protocol Check', checks: 'Testing SSL/TLS configurations...', duration: 800 },
+  { phase: 'Certificate Validation', checks: 'Validating certificate chain and expiry...', duration: 600 },
+  { phase: 'Cipher Suite Analysis', checks: 'Analyzing cipher suite strength...', duration: 500 },
+  { phase: 'Encryption Key Assessment', checks: 'Checking encryption key lengths...', duration: 400 },
+  { phase: 'Authentication Policy Check', checks: 'Reviewing authentication mechanisms...', duration: 700 },
+  { phase: 'Default Credentials Test', checks: 'Testing for default credentials...', duration: 600 },
+  { phase: 'Account Lockout Policy', checks: 'Verifying account lockout configurations...', duration: 400 },
+  { phase: 'Privilege Analysis', checks: 'Analyzing privilege assignments...', duration: 500 },
+  { phase: 'API Security Assessment', checks: 'Testing API authentication and rate limiting...', duration: 600 },
+  { phase: 'Session Management Check', checks: 'Analyzing session security configurations...', duration: 500 },
+  { phase: 'Configuration Baseline', checks: 'Comparing against security baselines...', duration: 700 },
+  { phase: 'Patch Level Assessment', checks: 'Checking for unpatched vulnerabilities...', duration: 800 },
+  { phase: 'Legacy Software Detection', checks: 'Identifying end-of-life software...', duration: 500 },
+  { phase: 'Debug Mode Detection', checks: 'Checking for debug mode exposure...', duration: 400 },
+  { phase: 'Test Interface Discovery', checks: 'Finding exposed test interfaces...', duration: 400 },
+  { phase: 'Backup File Exposure', checks: 'Scanning for exposed backup files...', duration: 500 },
+  { phase: 'Error Handling Review', checks: 'Analyzing error message disclosure...', duration: 400 },
+  { phase: 'Logging/Monitoring Check', checks: 'Verifying logging and monitoring...', duration: 600 },
+  { phase: 'IoT Device Discovery', checks: 'Identifying IoT devices on network...', duration: 700 },
+  { phase: 'OT Protocol Analysis', checks: 'Scanning Modbus, DNP3, OPC protocols...', duration: 800 },
+  { phase: 'SCADA Interface Check', checks: 'Testing SCADA HMI accessibility...', duration: 700 },
+  { phase: 'Device Authentication', checks: 'Verifying OT device authentication...', duration: 600 },
+  { phase: 'Firmware Security Check', checks: 'Analyzing firmware update security...', duration: 500 },
+  { phase: 'OT Network Segmentation', checks: 'Reviewing OT network architecture...', duration: 600 },
+  { phase: 'CERT-In Compliance', checks: 'Checking CERT-In guideline compliance...', duration: 700 },
+  { phase: 'NIC Baseline Deviation', checks: 'Comparing against NIC security baseline...', duration: 600 },
+  { phase: 'Cyber Hygiene Assessment', checks: 'Evaluating cyber hygiene controls...', duration: 500 },
+  { phase: 'Incident Response Review', checks: 'Checking incident response readiness...', duration: 600 },
+  { phase: 'Defence-in-Depth Analysis', checks: 'Evaluating multi-layer security controls...', duration: 700 },
+  { phase: 'Final Risk Compilation', checks: 'Compiling risk assessment results...', duration: 400 },
+];
+
+// Helper function to get random vulnerabilities based on risk profile
+function getRandomVulnerabilities(count: number): Vulnerability[] {
+  const shuffled = [...scanChecks].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+}
+
+// Generate random open ports based on system type
+function getRandomPorts(systemType: SystemType): number[] {
+  const basePorts = [22, 80, 443]; // Common ports
+  const additionalPorts: Record<SystemType, number[]> = {
+    smart_port: [21, 23, 502, 102, 4840, 47808, 161, 3389, 8080, 1433, 5432],
+    ship_network: [10110, 5060, 1883, 502, 8080, 8443, 161, 3389, 23, 21],
+    logistics_system: [1433, 3306, 5432, 6379, 27017, 8080, 8443, 9200, 9300, 8161],
+  };
+
+  const systemPorts = additionalPorts[systemType];
+  const selectedPorts = [...basePorts];
+
+  // Add 3-7 random additional ports
+  const numAdditional = Math.floor(Math.random() * 5) + 3;
+  for (let i = 0; i < numAdditional; i++) {
+    const randomPort = systemPorts[Math.floor(Math.random() * systemPorts.length)];
+    if (!selectedPorts.includes(randomPort)) {
+      selectedPorts.push(randomPort);
+    }
+  }
+
+  return selectedPorts.sort((a, b) => a - b);
 }
 
 // Calculate risk score based on vulnerabilities
 function calculateRiskScore(vulnerabilities: Vulnerability[]): number {
+  if (vulnerabilities.length === 0) return 15;
+
   const severityWeights = {
-    low: 5,
-    medium: 15,
-    high: 25,
-    critical: 35,
+    critical: 25,
+    high: 15,
+    medium: 8,
+    low: 3,
   };
-  
-  let score = 0;
-  vulnerabilities.forEach(v => {
-    score += severityWeights[v.severity];
+
+  let totalScore = 0;
+  vulnerabilities.forEach((vuln) => {
+    totalScore += severityWeights[vuln.severity];
   });
-  
-  // Cap at 100
-  return Math.min(100, Math.max(0, score));
+
+  // Normalize to 0-100 scale
+  return Math.min(Math.max(totalScore, 15), 95);
 }
 
 // Determine risk level from score
 function getRiskLevel(score: number): RiskLevel {
-  if (score <= 30) return 'low';
-  if (score <= 60) return 'medium';
-  return 'high';
+  if (score >= 70) return 'high';
+  if (score >= 40) return 'medium';
+  return 'low';
 }
 
-// Generate unique scan ID
-function generateScanId(): string {
-  return `SCAN-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-}
-
-// Main scan function - simulates API call to /scan endpoint
+// Main scan function - simulates API call
 export async function performScan(
   target: string,
   systemType: SystemType,
-  onProgress?: (phase: string, percent: number) => void
+  onProgress?: (phase: string, progress: number, checks: string) => void
 ): Promise<ScanResult> {
-  const startTime = Date.now();
-  
-  // Expanded scan phases - 15 phases for comprehensive scanning
-  const phases = [
-    'Initializing scan engine...',
-    'Performing DNS resolution...',
-    'Executing port discovery (1-1024)...',
-    'Scanning high ports (1025-65535)...',
-    'Identifying running services...',
-    'Checking security headers...',
-    'Analyzing SSL/TLS configuration...',
-    'Testing cipher suites...',
-    'Evaluating authentication mechanisms...',
-    'Scanning for SCADA/ICS protocols...',
-    'Checking industrial control ports...',
-    'Analyzing network segmentation...',
-    'Detecting misconfigurations...',
-    'Evaluating access controls...',
-    'Generating risk assessment...',
-  ];
-  
-  for (let i = 0; i < phases.length; i++) {
-    onProgress?.(phases[i], ((i + 1) / phases.length) * 100);
-    await delay(400 + Math.random() * 300);
+  const totalPhases = scanPhases.length;
+
+  // Simulate scanning through each phase
+  for (let i = 0; i < totalPhases; i++) {
+    const phase = scanPhases[i];
+    const progress = Math.round(((i + 1) / totalPhases) * 100);
+
+    if (onProgress) {
+      onProgress(phase.phase, progress, phase.checks);
+    }
+
+    // Simulate network delay
+    await new Promise((resolve) => setTimeout(resolve, phase.duration));
   }
-  
-  const vulnerabilities = getRandomVulnerabilities(systemType);
+
+  // Generate results
+  const numVulnerabilities = Math.floor(Math.random() * 10) + 8; // 8-17 vulnerabilities
+  const vulnerabilities = getRandomVulnerabilities(numVulnerabilities);
+  const openPorts = getRandomPorts(systemType);
   const riskScore = calculateRiskScore(vulnerabilities);
   const riskLevel = getRiskLevel(riskScore);
-  
-  // Generate common port list based on findings
-  const basePorts = [22, 80, 443];
-  const vulnPorts = vulnerabilities
-    .filter(v => v.port)
-    .map(v => v.port as number);
-  
-  const openPorts = [...new Set([...basePorts, ...vulnPorts])].sort((a, b) => a - b);
-  
-  // Total checks = 30 security checks per system type
-  const totalChecks = 30;
-  
-  const result: ScanResult = {
-    scan_id: generateScanId(),
+
+  const passedChecks = 70 - vulnerabilities.length;
+  const warnings = Math.floor(vulnerabilities.filter((v) => v.severity === 'low' || v.severity === 'medium').length);
+  const failedChecks = vulnerabilities.filter((v) => v.severity === 'high' || v.severity === 'critical').length;
+
+  return {
+    scan_id: `SCAN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     target,
     system_type: systemType,
     timestamp: new Date().toISOString(),
@@ -832,50 +791,98 @@ export async function performScan(
     risk_level: riskLevel,
     open_ports: openPorts,
     vulnerabilities,
-    scan_duration: (Date.now() - startTime) / 1000,
+    scan_duration: Math.floor(Math.random() * 60) + 90, // 90-150 seconds
     summary: {
-      total_checks: totalChecks,
-      passed_checks: totalChecks - vulnerabilities.length,
-      failed_checks: vulnerabilities.filter(v => v.severity === 'critical' || v.severity === 'high').length,
-      warnings: vulnerabilities.filter(v => v.severity === 'medium' || v.severity === 'low').length,
+      total_checks: 70,
+      passed_checks: passedChecks,
+      failed_checks: failedChecks,
+      warnings: warnings,
     },
   };
-  
-  return result;
 }
 
-// AI-generated recommendations based on findings
-export function generateMitigationReport(result: ScanResult): string {
-  const criticalCount = result.vulnerabilities.filter(v => v.severity === 'critical').length;
-  const highCount = result.vulnerabilities.filter(v => v.severity === 'high').length;
-  
-  let report = `## Executive Summary\n\n`;
-  report += `A comprehensive cyber risk assessment was conducted on **${result.target}** `;
-  report += `(${result.system_type.replace('_', ' ').toUpperCase()}) on ${new Date(result.timestamp).toLocaleDateString()}.\n\n`;
-  
-  report += `### Risk Assessment: ${result.risk_level.toUpperCase()} (Score: ${result.risk_score}/100)\n\n`;
-  
-  if (criticalCount > 0 || highCount > 0) {
-    report += `⚠️ **Immediate Action Required**: ${criticalCount} critical and ${highCount} high severity issues detected.\n\n`;
-  }
-  
-  report += `## Key Findings\n\n`;
-  result.vulnerabilities.forEach((v, i) => {
-    report += `### ${i + 1}. ${v.name}\n`;
-    report += `- **Severity**: ${v.severity.toUpperCase()}\n`;
-    report += `- **Description**: ${v.description}\n`;
-    report += `- **Recommendation**: ${v.recommendation}\n\n`;
+// Generate mitigation report
+export function generateMitigationReport(scanResult: ScanResult): string {
+  const { vulnerabilities, risk_score, risk_level, target, timestamp, summary } = scanResult;
+
+  let report = `
+================================================================================
+       SMART PORT / NAVAL INFRASTRUCTURE SECURITY ASSESSMENT REPORT
+================================================================================
+
+Target System: ${target}
+System Type: ${scanResult.system_type.replace('_', ' ').toUpperCase()}
+Assessment Date: ${new Date(timestamp).toLocaleString()}
+Report ID: ${scanResult.scan_id}
+
+================================================================================
+                           EXECUTIVE SUMMARY
+================================================================================
+
+Overall Risk Score: ${risk_score}/100
+Risk Classification: ${risk_level.toUpperCase()}
+
+Total Security Checks Performed: ${summary.total_checks}
+├── Passed Checks: ${summary.passed_checks}
+├── Failed Checks (High/Critical): ${summary.failed_checks}
+└── Warnings (Low/Medium): ${summary.warnings}
+
+================================================================================
+                        DETAILED FINDINGS BY CATEGORY
+================================================================================
+`;
+
+  // Group vulnerabilities by category
+  const categories = [...new Set(vulnerabilities.map((v) => v.category))];
+
+  categories.forEach((category) => {
+    const categoryVulns = vulnerabilities.filter((v) => v.category === category);
+    report += `\n--- ${category.toUpperCase()} ---\n\n`;
+
+    categoryVulns.forEach((vuln, index) => {
+      report += `[${vuln.severity.toUpperCase()}] ${vuln.name}
+   ID: ${vuln.id}
+   Description: ${vuln.description}
+   ${vuln.port ? `Port: ${vuln.port}` : ''}
+   ${vuln.service ? `Service: ${vuln.service}` : ''}
+   Recommendation: ${vuln.recommendation}
+
+`;
+    });
   });
-  
-  report += `## Compliance Considerations\n\n`;
-  report += `This assessment aligns with:\n`;
-  report += `- Indian Navy Cybersecurity Guidelines\n`;
-  report += `- NCIIPC Critical Infrastructure Protection Framework\n`;
-  report += `- IMO Maritime Cyber Risk Management Guidelines\n\n`;
-  
-  report += `---\n\n`;
-  report += `*Disclaimer: This is an assessment-only report. No exploitation or intrusive testing was performed. `;
-  report += `Findings are based on non-intrusive security checks suitable for educational and preventive purposes.*`;
-  
+
+  report += `
+================================================================================
+                        COMPLIANCE ALIGNMENT
+================================================================================
+
+This assessment aligns with the following frameworks:
+• CERT-In Security Guidelines
+• NIC Security Baseline
+• IEC 62443 (Industrial Automation)
+• NIST Cybersecurity Framework
+• IMO Maritime Cyber Risk Management Guidelines
+
+================================================================================
+                        REMEDIATION PRIORITY
+================================================================================
+
+IMMEDIATE (Within 24 Hours):
+${vulnerabilities.filter((v) => v.severity === 'critical').map((v) => `• ${v.name}`).join('\n') || '• No critical issues found'}
+
+HIGH PRIORITY (Within 7 Days):
+${vulnerabilities.filter((v) => v.severity === 'high').map((v) => `• ${v.name}`).join('\n') || '• No high priority issues found'}
+
+MEDIUM PRIORITY (Within 30 Days):
+${vulnerabilities.filter((v) => v.severity === 'medium').map((v) => `• ${v.name}`).join('\n') || '• No medium priority issues found'}
+
+LOW PRIORITY (Within 90 Days):
+${vulnerabilities.filter((v) => v.severity === 'low').map((v) => `• ${v.name}`).join('\n') || '• No low priority issues found'}
+
+================================================================================
+                           END OF REPORT
+================================================================================
+`;
+
   return report;
 }

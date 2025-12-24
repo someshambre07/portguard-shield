@@ -34,6 +34,7 @@ const generateDemoData = (): ScanResult => ({
       port: 21,
       service: 'FTP',
       recommendation: 'Replace FTP with SFTP.',
+      category: 'Remote Access & Management',
     },
     {
       id: 'V002',
@@ -41,6 +42,7 @@ const generateDemoData = (): ScanResult => ({
       description: 'HTTP Strict Transport Security header not configured.',
       severity: 'medium',
       recommendation: 'Enable HSTS header.',
+      category: 'Web & Application Security',
     },
     {
       id: 'V003',
@@ -50,6 +52,7 @@ const generateDemoData = (): ScanResult => ({
       port: 502,
       service: 'Modbus',
       recommendation: 'Implement network segmentation.',
+      category: 'IoT/OT Maritime Systems',
     },
   ],
   scan_duration: 5.2,
