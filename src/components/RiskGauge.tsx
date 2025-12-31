@@ -19,12 +19,14 @@ const levelColors: Record<RiskLevel, string> = {
   low: 'stroke-success',
   medium: 'stroke-warning',
   high: 'stroke-destructive',
+  critical: 'stroke-destructive',
 };
 
 const levelBgColors: Record<RiskLevel, string> = {
   low: 'text-success',
   medium: 'text-warning',
   high: 'text-destructive',
+  critical: 'text-destructive',
 };
 
 export function RiskGauge({ score, level, size = 'md', animated = true }: RiskGaugeProps) {
@@ -108,7 +110,7 @@ export function RiskGauge({ score, level, size = 'md', animated = true }: RiskGa
           'px-4 py-1 rounded-full text-sm font-semibold uppercase tracking-wide',
           level === 'low' && 'bg-success/20 text-success',
           level === 'medium' && 'bg-warning/20 text-warning',
-          level === 'high' && 'bg-destructive/20 text-destructive'
+          (level === 'high' || level === 'critical') && 'bg-destructive/20 text-destructive'
         )}
       >
         {level} Risk
