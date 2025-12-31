@@ -13,7 +13,9 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScanProgress } from '@/components/ScanProgress';
 import { useScan } from '@/context/ScanContext';
+import { useAuth } from '@/context/AuthContext';
 import { performScan, type SystemType } from '@/lib/mockApi';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, AlertTriangle, Server, Ship, Package } from 'lucide-react';
 
@@ -41,6 +43,7 @@ const systemTypes = [
 export default function Scan() {
   const navigate = useNavigate();
   const { setScanResult, setIsScanning } = useScan();
+  const { user } = useAuth();
   const { toast } = useToast();
   
   const [target, setTarget] = useState('');
@@ -101,6 +104,23 @@ export default function Scan() {
       );
       
       setScanResult(result);
+      
+      // Save scan report to database
+      if (user) {
+        await supabase.from('scan_reports').insert({
+          user_id: user.id,
+          target: result.target,
+          system_type: result.system_type,
+          risk_score: result.risk_score,
+          risk_level: result.risk_level,
+          vulnerabilities: result.vulnerabilities as any,
+          scan_data: {
+            open_ports: result.open_ports,
+            scan_duration: result.scan_duration,
+            summary: result.summary,
+          } as any,
+        });
+      }
       
       toast({
         title: 'Scan Complete',

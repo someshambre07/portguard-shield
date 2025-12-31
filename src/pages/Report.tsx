@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { generateMitigationReport, type ScanResult } from '@/lib/mockApi';
+import { generatePdfReport } from '@/lib/pdfGenerator';
+import { useToast } from '@/hooks/use-toast';
 import { 
   FileText, 
   Download, 
@@ -13,7 +15,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Printer
+  Printer,
+  Loader2
 } from 'lucide-react';
 
 // Demo data
@@ -66,8 +69,10 @@ const generateDemoData = (): ScanResult => ({
 
 export default function Report() {
   const { scanResult } = useScan();
+  const { toast } = useToast();
   const [data, setData] = useState<ScanResult | null>(null);
   const [report, setReport] = useState<string>('');
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const result = scanResult || generateDemoData();
@@ -77,6 +82,26 @@ export default function Report() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownload = async () => {
+    if (!data) return;
+    setIsDownloading(true);
+    try {
+      await generatePdfReport(data);
+      toast({
+        title: 'Download Complete',
+        description: 'Report has been downloaded successfully.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Download Failed',
+        description: 'Failed to generate PDF report.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   if (!data) {
@@ -104,8 +129,12 @@ export default function Report() {
             <Printer className="w-4 h-4" />
             Print
           </Button>
-          <Button className="gap-2">
-            <Download className="w-4 h-4" />
+          <Button className="gap-2" onClick={handleDownload} disabled={isDownloading}>
+            {isDownloading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
             Download PDF
           </Button>
         </div>

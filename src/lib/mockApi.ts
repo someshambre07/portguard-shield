@@ -3,7 +3,7 @@
 
 export type SystemType = 'smart_port' | 'ship_network' | 'logistics_system';
 
-export type RiskLevel = 'low' | 'medium' | 'high';
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 export interface Vulnerability {
   id: string;
