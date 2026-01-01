@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ClearHistoryDialog } from '@/components/ClearHistoryDialog';
 import { useToast } from '@/hooks/use-toast';
 import { 
   History, 
@@ -21,7 +22,8 @@ import {
   Loader2,
   FileText,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { generatePdfReport } from '@/lib/pdfGenerator';
 
@@ -46,6 +48,7 @@ export default function ScanHistory() {
   const [reports, setReports] = useState<ScanReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [showClearDialog, setShowClearDialog] = useState(false);
   const { toast } = useToast();
 
   const fetchReports = async () => {
@@ -92,12 +95,12 @@ export default function ScanHistory() {
         vulnerabilities: (Array.isArray(report.vulnerabilities) ? report.vulnerabilities : []) as any[],
         open_ports: ((report.scan_data as any)?.open_ports || []) as number[],
         scan_duration: ((report.scan_data as any)?.scan_duration || 0) as number,
-      summary: ((report.scan_data as any)?.summary || {
-        total_checks: 70,
-        passed_checks: 0,
-        failed_checks: 0,
-        warnings: 0,
-      }) as any,
+        summary: ((report.scan_data as any)?.summary || {
+          total_checks: 70,
+          passed_checks: 0,
+          failed_checks: 0,
+          warnings: 0,
+        }) as any,
       };
 
       await generatePdfReport(scanResult);
@@ -145,10 +148,22 @@ export default function ScanHistory() {
             </Button>
           </Link>
         </div>
-        <Button variant="outline" onClick={fetchReports} disabled={isLoading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={fetchReports} disabled={isLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          {reports.length > 0 && (
+            <Button 
+              variant="destructive" 
+              onClick={() => setShowClearDialog(true)}
+              disabled={isLoading}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear All History
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Title Card */}
@@ -270,6 +285,13 @@ export default function ScanHistory() {
           )}
         </CardContent>
       </Card>
+
+      {/* Clear History Dialog */}
+      <ClearHistoryDialog
+        open={showClearDialog}
+        onOpenChange={setShowClearDialog}
+        onSuccess={fetchReports}
+      />
     </div>
   );
 }
